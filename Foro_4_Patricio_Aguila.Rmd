@@ -1,0 +1,468 @@
+---
+title: '**Modelamiento Estadístico y Sistemas Recomendadores: Foro 4**'
+author: '*Patricio Águila Márquez*'
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Instrucciones
+
+Considere los datos de una empresa dedicada a la venta de paquetes de viajes a destinos exclusivos en Europa. La empresa tiene información histórica de 704 clientes, a lo largo de tres países de américa latina, y le interesa realizar recomendaciones para un grupo selecto de clientes, a los cuales se desea fidelizar.
+
+La empresa cuenta con destinos en tres ciudades: Madrid, Londres y París. De estas tres ubicaciones, Londres y París corresponden a destinos recientemente incorporados, mientras que Madrid corresponde al primer destino en la cual la empresa comenzó su operación. La empresa cuenta con cierta información personal sobre los clientes. Adicionalmente, ha registrado el motivo más usual del viaje, y si han viajado a su locación original (Madrid) en el pasado.
+
+Recientemente, la empresa ha decidido lanzar un programa de fidelización para un grupo selecto de clientes poco activos en su plataforma web, en el cual desea plantear atractivas ofertas a los dos nuevos destinos exclusivos ubicados en las ciudades de Londres y París. Para ello, la empresa ha decidido desarrollar un sistema recomendador que le permita maximizar el interés de estos clientes en su oferta. La información de estos clientes se encuentra en el archivo “fidelización.csv”.
+
+La empresa no sabe a priori si estos clientes tienen interés o no en los destinos. Sin embargo, tiene acceso a los registros de comportamiento web de los clientes presentes en el conjunto de datos “travel.csv”, en particular, si han cotizado o no los destinos a Londres y París.
+
+El objetivo de este Foro consiste en construir dos sistemas recomendadores, basados en filtrado colaborativo (modelando el problema de recomendación como uno de clasificación), que le permitan a la empresa realizar recomendaciones efectivas al grupo selecto de clientes.
+
+Las variables que se encuentran en el conjunto de datos se describen en la siguiente tabla:
+
+|**Variable**|**Descripción**|
+|:-|:---------------|
+|Gender | Género (“male” o “female”).|
+|Children | Indica 1 si viaja con hijos, 0 si no.|
+|Country | País de residencia (Argentina, Perú o Chile).|
+Motive | Indica “travel” si el motivo del viaje es turismo, y “business” si está asociado a negocios.|
+|Age | Edad.|
+|Madrid | Indica 1 si el año anterior viajó a madrid, 0 si no.| 
+|London | Indica 1 si manifestó interés en viajar a Londres, 0 si no.|
+|París | Indica 1 si manifestó interés en viajar a París, 0 si no.|
+
+\newpage
+
+Para lograr lo anterior, desarrolle las siguientes actividades:
+
+**1. Responda y argumente en el Foro. ¿Por qué es posible interpretar el sistema recomendador deseado como un problema de clasificación binaria?.**
+
+ * *Resp: se puede interpretar como un problema de clasificación binario, debido a que las variables de interés del ejercicio presentan solo dos estados (viajó/no viajó, tiene interés/no tiene interés).*
+
+```{r, message=FALSE, echo=FALSE}
+# Cargar librerías
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(e1071) 
+library(adabag)
+library(rminer)
+library(tidyverse)
+```
+
+
+**2. Cargue el conjunto de datos en la sesión de trabajo de `R` usando la función `read.table`.**
+
+```{r}
+# Carga de datos de archivo "travel.csv"
+datos <- read.csv("../04 Foro 4/travel.csv",header=TRUE, sep=",")
+```
+
+**3. Separe los datos en *datos.paris* y *datos.londres*. El objetivo de esta separación es desarrollar un sistema recomendador para cada destino, basado en la data de cada usuario, si aprovecharon o no la oferta a madrid el año anterior, y si manifiestan interés en viajar a la ciudad en cuestión.**
+
+```{r, echo=FALSE}
+# Separacion:  Paris y Londres.
+datos.paris = subset(datos, select= -london)
+datos.londres = subset(datos, select= -paris)
+
+# Convertimos variables necesarias a factores: París
+factor.vars <- c('paris' ,'madrid', 'gender', 'marital_status', 
+                 'country', 'children', 'motive')
+datos.paris[, factor.vars] <- lapply(datos.paris[,factor.vars] , factor)
+
+# Convertimos variables necesarias a factores: Londres
+factor.vars <- c('london' ,'madrid', 'gender', 'marital_status', 
+                 'country', 'children', 'motive')
+datos.londres[, factor.vars] <- lapply(datos.londres[,factor.vars] , factor)
+```
+
+ * *Resumen de los datos: París*
+```{r, echo=FALSE}
+# Resumen de los datos: París
+summary(datos.paris)
+```
+
+ * *Resumen de los datos: Londres*
+```{r, echo=FALSE}
+# Resumen de los datos: Londres
+summary(datos.londres)
+
+```
+
+\newpage
+
+**4. Desarrolle un sistema recomendador que le permita determinar si debe o no ofrecer una oferta que tenga como destino la ciudad de París. Para ello:**
+  
+**a. Seleccione de manera aleatoria 70% de las observaciones para crear sus datos de entrenamiento y guarde el 30% restante para objeto de validación, tal como lo hizo en el Foro 2.**
+    
+```{r, echo=FALSE}
+# Particionamos los datos en trabajo y validación
+set.seed(1)
+smp_size <- floor(0.7 * nrow(datos.paris))
+train_ind <- sample(seq_len(nrow(datos.paris)), size = smp_size)
+datos.trabajo.paris <- datos.paris[train_ind, ]
+datos.validacion.paris <- datos.paris[-train_ind, ]
+```
+
+
+ * *Conjunto de entrenamiento (70%  de los datos de París)*
+```{r, echo=FALSE}
+summary(datos.trabajo.paris)
+```
+
+ * *Conjunto de validación (30%  de los datos de París)*
+```{r, echo=FALSE}
+summary(datos.validacion.paris)
+```
+
+\newpage
+    
+**b. Entrene al menos 3 de los algoritmos de clasificación vistos en clase, que tengan como variable objetivo el interés en viajar a parís.**
+  
+```{r}
+# Entrenamos modelos de clasificación
+
+# Árbol de decisión
+recomendador.tree.paris <- rpart(paris ~ ., data=datos.trabajo.paris, 
+                                 parms = list(split = "gini"))
+
+# Bayes Ingenuo
+recomendador.nb.paris <- naiveBayes(paris ~ .,data=datos.trabajo.paris)
+
+# Bagging
+recomendador.bagging.paris <- bagging(paris ~., data=datos.trabajo.paris, 
+                                      mfinal=10)
+
+# Boosting
+recomendador.boosting.paris <- boosting(paris ~., data=datos.trabajo.paris, 
+                                        mfinal=10)
+
+# Random Forest
+recomendador.rf.paris <- randomForest(paris ~ ., data=datos.trabajo.paris, 
+                                      ntree=100, proximity=TRUE)
+```
+  
+\newpage
+  
+**c. Evalúe el desempeño de los clasificadores a través de realizar una predicción en el conjunto de prueba utilizando la métrica de exactitud, y comente en el foro qué algoritmo resulta ganador.**
+    
+```{r, echo=FALSE}
+# Generamos la predicción para cada modelo.
+
+# Árbol de decisión
+pred.tree.paris <- predict(recomendador.tree.paris, datos.validacion.paris,
+                           type='class')
+# Bayes Ingenuo
+pred.nb.paris <- predict(recomendador.nb.paris, datos.validacion.paris,
+                         type='class')
+# Bagging
+pred.bagging.paris <- predict(recomendador.bagging.paris, 
+                              datos.validacion.paris, type='class')
+# Boosting
+pred.boosing.paris <- predict(recomendador.boosting.paris,
+                              datos.validacion.paris, type='class')
+# Random Forest
+pred.rf.paris <- predict(recomendador.rf.paris, datos.validacion.paris,
+                         type='class')
+```
+
+
+
+EVALUACIÓN DE DESEMPEÑO USANDO LA MÉTRICA DE 'EXACTITUD'.
+
+**Clasificador: Árbol de decisión**
+```{r, echo=FALSE}
+# Árbol de decisión
+round(mmetric(datos.validacion.paris$paris, pred.tree.paris, "ACC"),2)
+```
+
+**Clasificador: Bayes Ingenuo**
+```{r, echo=FALSE}
+# Bayes Ingenuo
+round(mmetric(datos.validacion.paris$paris, pred.nb.paris, "ACC"),2)
+```
+
+**Clasificador: Bagging**
+```{r, echo=FALSE}
+# Bagging
+round(mmetric(datos.validacion.paris$paris, pred.bagging.paris$class, "ACC"),2) 
+```
+
+**Clasificador: Boosting**
+```{r, echo=FALSE}
+# Boosting
+round(mmetric(datos.validacion.paris$paris, pred.boosing.paris$class, "ACC"),2)
+```
+
+**Clasificador: Random Forest**
+```{r, echo=FALSE}
+# Random Forest
+round(mmetric(datos.validacion.paris$paris, pred.rf.paris, "ACC"),2)
+```
+
+ * *Resp: se evaluó el desempeño de los clasificadores usando 2 semillas distintas (1 y 16). Para efectos de presentación de resultados se utilizó `set.seed(1)`.*
+ 
+  + *Para el caso de la semilla igual a 1, los mejores modelos fueron Árbol de Decisión y Boosting.*
+  
+  + *Para el caso de la semilla igual a 16, los modelos con un índice más elevado fueron Árbol de Decisión y Bagging*
+  
+  + *En ambos casos, el modelo con un valor más alto para la métrica de exactitud fue **'Árbol de Decisión'**.*
+
+
+**d. Responda en el foro: ¿Por qué puede ser conveniente utilizar la métrica de exactitud, y no otra, desde el punto de vista de la recomendación?.**
+    
+ * *Resp: en este ejercicio, en donde tenemos poca cantidad de datos y poco feedback por parte del usuario, sí conviene utilizar la métrica de exactitud, ya que no solo buscamos predecir y acertar a una condición positiva (verdaderos positivos), sino que también predecir y acertar a una condición negativa (verdaderos negativos) con el propósito de no ofrecer recomendaciones que al cliente no le interesen. Es decir, buscamos maximizar: ([Verdaderos Positivos + Verdaderos Negativos]/Población Total).* 
+ 
+ * *Por otra parte, la métrica de exactitud puede llevar a interpretaciones erróneas si el set de datos no está balanceado [1]*   
+ 
+ * *Ahora, si se tratara de un set de datos con miles/millones de usuarios e ítems, como por ejemplo Spotify y Netflix, ya no sería tan atractivo medir solamente la exactitud de los sistemas recomendadores, sino también incluir métricas como 'diversity' (variabilidad de ítems presentes en la lista de recomendaciones), 'novelty' (habilidad de recomendar al usuario ítems que no haya experimentado anteriormente) y 'serendipity' (qué tan sorprendente es para el usuario una lista de recomendaciones) [2][3].*
+
+\newpage
+
+**5. Repita el paso anterior para el sistema recomendador asociado a la ciudad de Londres.**
+
+```{r, echo=FALSE}
+# Particionamos los datos en trabajo y validacion
+set.seed(1)
+smp_size <- floor(0.7 * nrow(datos.londres))
+train_ind <- sample(seq_len(nrow(datos.londres)), size = smp_size)
+datos.trabajo.londres <- datos.londres[train_ind, ]
+datos.validacion.londres <- datos.londres[-train_ind, ]
+```
+
+ * *Conjunto de entrenamiento (70%  de los datos)*
+```{r, echo=FALSE}
+summary(datos.trabajo.londres)
+```
+
+
+ * *Conjunto de validación (30%  de los datos)*
+```{r, echo=FALSE}
+summary(datos.validacion.londres)
+
+```
+
+\newpage
+
+
+```{r, echo=FALSE}
+# Árbol de decisión
+recomendador.tree.londres <- rpart(london ~ ., data=datos.trabajo.londres, 
+                                   parms = list(split = "gini"))
+
+# Bayes Ingenuo
+recomendador.nb.londres <- naiveBayes(london ~ .,data=datos.trabajo.londres)
+
+# Bagging
+recomendador.bagging.londres <- bagging(london ~., data=datos.trabajo.londres,
+                                        mfinal=10)
+
+# Boosting
+recomendador.boosting.londres <- boosting(london ~., data=datos.trabajo.londres,
+                                          mfinal=10)
+
+# Random Forest
+recomendador.rf.londres <- randomForest(london ~ ., data=datos.trabajo.londres,
+                                        ntree=100, proximity=TRUE)
+```
+
+```{r, echo=FALSE}
+# Generamos la predicción para cada modelo.
+
+# Árbol de decisión
+pred.tree.londres <- predict(recomendador.tree.londres, 
+                             datos.validacion.londres, type='class')
+
+# Bayes Ingenuo
+pred.nb.londres <- predict(recomendador.nb.londres, datos.validacion.londres,
+                           type='class')
+
+# Bagging
+pred.bagging.londres <- predict(recomendador.bagging.londres,
+                                datos.validacion.londres, type='class')
+
+# Boosting
+pred.boosting.londres <- predict(recomendador.boosting.londres,
+                                 datos.validacion.londres, type='class')
+
+# Random Forest
+pred.rf.londres <- predict(recomendador.rf.londres, datos.validacion.londres,
+                           type='class')
+```
+
+
+EVALUACIÓN DE DESEMPEÑO USANDO LA MÉTRICA DE 'EXACTITUD'.
+
+**Clasificador: Árbol de Decisión**
+```{r, echo=FALSE}
+# Árbol de decisión
+round(mmetric(datos.validacion.londres$london, pred.tree.londres, "ACC"),2)
+```
+
+**Clasificador: Bayes Ingenuo**
+```{r, echo=FALSE}
+# Bayes Ingenuo
+round(mmetric(datos.validacion.londres$london, pred.nb.londres, "ACC"),2) 
+```
+
+**Clasificador: Bagging**
+```{r, echo=FALSE}
+# Bagging
+round(mmetric(datos.validacion.londres$london, pred.bagging.londres$class, "ACC"),2)
+```
+
+**Clasificador: Boosting**
+```{r, echo=FALSE}
+# Boosting
+round(mmetric(datos.validacion.londres$london, pred.boosting.londres$class, "ACC"),2)
+```
+
+**Clasificador: Random Forest**
+```{r, echo=FALSE}
+# Random Forest
+round(mmetric(datos.validacion.londres$london, pred.rf.londres, "ACC"),2)
+```
+
+ * *Resp: se evaluó el desempeño de los clasificadores usando 2 semillas distintas (1 y 16). Para efectos de presentación de resultados se utilizó `set.seed(1)`.*
+ 
+  + *Para el caso de la semilla igual a 1, el mejor modelo fue Random Forest.*
+  
+  + *Para el caso de la semilla igual a 16, los modelos con un índice más elevado fueron Boosting y Random Forest.*
+  
+  + *En ambos casos, el modelo con un valor más alto para la métrica de exactitud fue **'Random Forest'**.*
+
+\newpage
+
+**6. Una vez construidos ambos sistemas recomendadores, cargue el conjunto de datos *fidelizacion.csv*, en la cual se presentan clientes pertenecientes al programa de fidelización. Para estos clientes, solamente se sabe si viajan o no a madrid el año anterior, por lo cual las columnas “london” y “paris” han sido dejadas en un valor nulo.**
+
+
+ * *Resumen clientes pertenecientes al programa de fidelización.*
+```{r, echo=FALSE}
+# Carga de Datos: Programa de fidelizacion
+datos.fid <- read.csv("../04 Foro 4/fidelizacion.csv", header=TRUE, sep=",")
+
+# Convertimos variables necesarias a factores:
+factor.vars <- c('madrid', 'gender', 'marital_status', 
+                 'country', 'children', 'motive')
+datos.fid[, factor.vars] <- lapply(datos.fid[,factor.vars] , factor)
+
+# Resumen de los datos
+datos.fid$london <- NULL
+datos.fid$paris  <- NULL
+summary(datos.fid)
+```
+
+**7. Utilizando los recomendadores, realice una recomendación hacia las ciudades de Londres y París para cada cliente.**
+
+```{r}
+# Recomendación a París, usando modelo mejor evaluado (Árbol de Decisión)
+pred.fid.paris <- predict(recomendador.tree.paris, 
+                          newdata = datos.fid,
+                          type='class')
+
+# Recomendación a Londres, usando modelo mejor evaluado (Random Forest)
+
+pred.fid.londres <- predict(recomendador.rf.londres, 
+                            newdata = datos.fid, 
+                            type='class')
+
+datos.fid.pred <- cbind(datos.fid, pred.fid.londres, pred.fid.paris)
+```
+
+\newpage
+
+**8. En base a las recomendaciones realizadas, calcule:**
+
+**a. La cantidad de clientes a cuales se les recomiendan ambas ciudades:**
+```{r}
+sum((pred.fid.londres == 1) & (pred.fid.paris == 1))
+```
+
+**b. La cantidad de clientes a los cuales se les recomienda solamente Londres:**
+```{r}
+sum((pred.fid.londres == 1) & (pred.fid.paris == 0))
+```
+    
+**c. La cantidad de clientes a los cuales se les recomienda solamente París:**
+```{r}
+sum((pred.fid.londres == 0) & (pred.fid.paris == 1))
+```
+    
+**d. La cantidad de clientes a los cuales no se les recomienda ningún viaje:**
+
+```{r}
+sum((pred.fid.londres == 0) & (pred.fid.paris == 0))
+```
+
+**Recordar que se usó una semilla igual a 1, por lo cual si se elige otra, las recomendaciones por destino de interés pueden variar.**
+
+\newpage
+    
+**9. En base a los cálculos del punto anterior, reflexione: ¿Qué servicio/oferta podría plantear la empresa para cada uno de los grupos anteriores?. Responda fundamentadamente en el Foro.**
+
+RESUMEN RESULTADOS POR GRUPO.
+
+**a: clientes a los que se les recomienda ambas ciudades.**
+
+ * *La mayoría de este grupo son personas provenientes de Argentina y Perú, casados, con hijos, cuyo motivo de viaje anterior fue por turismo.*
+ * *Se sugiere ofrecerles un pack de viaje familiar, con itinerario en ambas ciudades, pase de acceso a entretenciones para niños y visita a sitios patrimoniales.*
+```{r, echo=FALSE}
+# a: clientes a los que se les recomienda ambas ciudades.
+lon1_par1 <- datos.fid.pred %>% filter(pred.fid.londres == 1, pred.fid.paris == 1)
+summary(lon1_par1)
+```
+
+**b: clientes a los cuales se les recomienda solamente Londres.**
+
+ * *Grupo conformado por un solo cliente, hombre, sin hijos, soltero.*
+ * *Se sugiere ofrecerle un plan personalizado para visitar sitios patrimoniales y otorgar pase de entrada a lugares de la bohemia local.*
+```{r, echo=FALSE}
+# b: clientes a los cuales se les recomienda solamente Londres.
+lon1_par0 <- datos.fid.pred %>% filter(pred.fid.londres == 1, pred.fid.paris == 0)
+summary(lon1_par0)
+```
+
+\newpage
+
+**c: clientes a los cuales se les recomienda solamente París.**
+
+ * *La mayoría de este grupo son personas provenientes de Argentina y Perú, casados, con hijos, cuyo motivo de viaje anterior fue por turismo.* 
+ * *Este grupo es muy parecido al 'a', por lo cual se les oferta una propuesta parecida: pack de viaje familiar, con pase de acceso a entretenciones para niños y visita a sitios patrimoniales.*
+```{r, echo=FALSE}
+# c: clientes a los cuales se les recomienda solamente París.
+lon0_par1 <- datos.fid.pred %>% filter(pred.fid.londres == 0, pred.fid.paris == 1)
+summary(lon0_par1)
+```
+
+**d: clientes a los cuales no se les recomienda ningún viaje.**
+
+ * *Grupo mixto de clientes, los cuales el 100% viajaron por turismo a Madrid el año anterior.*
+ * *Sería necesario recopilar más antecedentes del porqué no manifiestan interés por los destinos sugeridos (por ejemplo, se podría evaluar su interés por otros destinos distintos a ciudades europeas).*
+```{r, echo=FALSE}
+# d: clientes a los cuales no se les recomienda ningún viaje.
+lon0_par0 <- datos.fid.pred %>% filter(pred.fid.londres == 0, pred.fid.paris == 0)
+summary(lon0_par0)
+```
+
+ * En resumen, como acción inmediata, se podría ofrecer una propuesta de viaje similar para los grupos 'a' y 'c', más una oferta personalizada para la persona del grupo 'b'.
+
+ * En lo que respecta al grupo 'd', se podría cuestionar si es necesario fidelizarlos, o bien, buscar otras estrategias para captar su interés.
+
+
+\newpage
+
+**BIBLIOGRAFÍA**
+
+[1][Accuracy, https://en.wikipedia.org/wiki/Precision_and_recall, Imbalanced data]
+
+[2][UCL Department of Computer Science, http://www.cs.ucl.ac.uk/fileadmin/UCL-CS/research/Research_Notes/RN_11_21.pdf, Why accuracy is not enough]
+
+[3][James Topor, https://rpubs.com/jt_rpubs/288709, Beyond accuracy: adding greater serendipity to a recommender system]
+
+
