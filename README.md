@@ -46,7 +46,11 @@ Para lograr lo anterior, desarrolle las siguientes actividades:
 8. En base a las recomendaciones realizadas, calcule:
     
     a. La cantidad de clientes a cuales se les recomiendan ambas ciudades.
+    
     b. La cantidad de clientes a los cuales se les recomienda solamente Londres.
+    
     c. La cantidad de clientes a los cuales se les recomienda solamente París.
+    
     d. La cantidad de clientes a los cuales no se les recomienda ningún viaje.
+
 9. En base a los cálculos del punto anterior, reflexione: ¿Qué servicio/oferta podría plantear la empresa para cada uno de los grupos anteriores?. Responda fundamentadamente en el Foro.
