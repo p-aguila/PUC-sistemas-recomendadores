@@ -36,6 +36,7 @@ Para lograr lo anterior, desarrolle las siguientes actividades:
   b. Entrene al menos 3 de los algoritmos de clasificación vistos en clase, que tengan como variable objetivo el interés en viajar a parís.
   c. Evalúe el desempeño de los clasificadores a través de realizar una predicción en el conjunto de prueba utilizando la métrica de exactitud, y comente en el foro qué algoritmo resulta ganador.
   d. Responda en el foro: ¿Por qué puede ser conveniente utilizar la métrica de exactitud, y no otra, desde el punto de vista de la recomendación?.
+
 5. Repita el paso anterior para el sistema recomendador asociado a la ciudad de Londres.
 6. Una vez construidos ambos sistemas recomendadores, cargue el conjunto de datos `fidelizacion.csv`, en la cual se presentan clientes pertenecientes al programa de fidelización. Para estos clientes, solamente se sabe si viajan o no a madrid el año anterior, por lo cual las columnas “london” y “paris” han sido dejadas en un valor nulo.
 7. Utilizando los recomendadores, realice una recomendación hacia las ciudades de Londres y París para cada cliente.
