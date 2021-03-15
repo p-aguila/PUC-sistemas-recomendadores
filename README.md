@@ -44,6 +44,7 @@ Para lograr lo anterior, desarrolle las siguientes actividades:
 6. Una vez construidos ambos sistemas recomendadores, cargue el conjunto de datos `fidelizacion.csv`, en la cual se presentan clientes pertenecientes al programa de fidelización. Para estos clientes, solamente se sabe si viajan o no a madrid el año anterior, por lo cual las columnas “london” y “paris” han sido dejadas en un valor nulo.
 7. Utilizando los recomendadores, realice una recomendación hacia las ciudades de Londres y París para cada cliente.
 8. En base a las recomendaciones realizadas, calcule:
+    
     a. La cantidad de clientes a cuales se les recomiendan ambas ciudades.
     b. La cantidad de clientes a los cuales se les recomienda solamente Londres.
     c. La cantidad de clientes a los cuales se les recomienda solamente París.
